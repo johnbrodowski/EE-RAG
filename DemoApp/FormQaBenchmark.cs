@@ -13,6 +13,9 @@ namespace DemoApp
         private QaBenchmarkReport? _lastReport;
         private BenchmarkSettings _settings = new();
 
+        private CancellationTokenSource? _runCts;
+        private CancellationTokenSource? _tuneCts;
+
         private static string DefaultDbPath =>
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
                          "Database", "QaDataset", "QaBenchmark.db");
@@ -34,33 +37,47 @@ namespace DemoApp
         {
             _settings = BenchmarkSettings.Load();
 
-            // Restore run controls
+            // Run controls
             var providerIdx = cmbProvider.Items.IndexOf(_settings.Provider);
             cmbProvider.SelectedIndex = providerIdx >= 0 ? providerIdx : 0;
             txtModel.Text = _settings.Model;
-            numQuestions.Value = Math.Max(numQuestions.Minimum,
-                                 Math.Min(numQuestions.Maximum, _settings.MaxQuestions));
-            numTemperature.Value = (decimal)Math.Max(0, Math.Min(2, _settings.Temperature));
+            numQuestions.Value = Clamp(numQuestions.Minimum, numQuestions.Maximum, _settings.MaxQuestions);
+            numTemperature.Value = Clamp(0M, 2M, (decimal)_settings.Temperature);
             chkUseRag.Checked = _settings.UseRag;
 
-            // Restore thresholds
-            numCorrectThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.CorrectThreshold));
-            numPossCorrectThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.PossiblyCorrectThreshold));
-            numDefWrongThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.DefinitelyWrongThreshold));
-            numIndetermThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.IndeterminateThreshold));
+            // Thresholds
+            numCorrectThresh.Value     = Clamp(0M, 100M, (decimal)_settings.CorrectThreshold);
+            numPossCorrectThresh.Value = Clamp(0M, 100M, (decimal)_settings.PossiblyCorrectThreshold);
+            numDefWrongThresh.Value    = Clamp(0M, 100M, (decimal)_settings.DefinitelyWrongThreshold);
+            numIndetermThresh.Value    = Clamp(0M, 100M, (decimal)_settings.IndeterminateThreshold);
+
+            // Tuning
+            txtTuneTemps.Text = _settings.TuneTemperatures;
+            txtTuneModels.Text = _settings.TuneModels;
+            numTuneQuestions.Value = Clamp(numTuneQuestions.Minimum, numTuneQuestions.Maximum, _settings.TuneQuestionsPerRun);
+            var scoreIdx = cmbTuneScore.Items.IndexOf(_settings.TuneScoreMetric);
+            if (scoreIdx < 0) scoreIdx = 0;
+            cmbTuneScore.SelectedIndex = scoreIdx;
         }
 
         private void SaveCurrentSettings()
         {
-            _settings.Provider = cmbProvider.Text.Trim();
-            _settings.Model = txtModel.Text.Trim();
+            _settings.Provider    = cmbProvider.Text.Trim();
+            _settings.Model       = txtModel.Text.Trim();
             _settings.MaxQuestions = (int)numQuestions.Value;
             _settings.Temperature = (double)numTemperature.Value;
-            _settings.UseRag = chkUseRag.Checked;
-            _settings.CorrectThreshold = (double)numCorrectThresh.Value;
-            _settings.PossiblyCorrectThreshold = (double)numPossCorrectThresh.Value;
-            _settings.DefinitelyWrongThreshold = (double)numDefWrongThresh.Value;
-            _settings.IndeterminateThreshold = (double)numIndetermThresh.Value;
+            _settings.UseRag      = chkUseRag.Checked;
+
+            _settings.CorrectThreshold         = (double)numCorrectThresh.Value;
+            _settings.PossiblyCorrectThreshold  = (double)numPossCorrectThresh.Value;
+            _settings.DefinitelyWrongThreshold  = (double)numDefWrongThresh.Value;
+            _settings.IndeterminateThreshold    = (double)numIndetermThresh.Value;
+
+            _settings.TuneTemperatures   = txtTuneTemps.Text.Trim();
+            _settings.TuneModels         = txtTuneModels.Text.Trim();
+            _settings.TuneQuestionsPerRun = (int)numTuneQuestions.Value;
+            _settings.TuneScoreMetric    = cmbTuneScore.Text;
+
             _settings.Save();
         }
 
@@ -84,13 +101,13 @@ namespace DemoApp
         {
             if (_db == null) return;
             var (total, embedded) = await _db.GetItemCountAsync();
-            lblEmbedStatus.Text = $"Embedded: {embedded:N0} / {total:N0}";
+            lblEmbedStatus.Text   = $"Embedded: {embedded:N0} / {total:N0}";
             lblEmbeddedCount.Text = $"({embedded:N0} embedded)";
 
             if (total > 0)
             {
                 pbarBackfill.Maximum = total;
-                pbarBackfill.Value = Math.Min(embedded, total);
+                pbarBackfill.Value   = Math.Min(embedded, total);
             }
             else
             {
@@ -104,7 +121,7 @@ namespace DemoApp
         {
             using var dlg = new OpenFileDialog
             {
-                Title = "Select JSONL Dataset File",
+                Title  = "Select JSONL Dataset File",
                 Filter = "JSONL files (*.jsonl)|*.jsonl|JSON files (*.json)|*.json|All files (*.*)|*.*"
             };
             if (dlg.ShowDialog() == DialogResult.OK)
@@ -116,38 +133,38 @@ namespace DemoApp
             var path = txtFilePath.Text.Trim();
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                lblImportStatus.Text = "File not found.";
+                lblImportStatus.Text      = "File not found.";
                 lblImportStatus.ForeColor = Color.Red;
                 return;
             }
 
             if (_db == null)
             {
-                lblImportStatus.Text = "Database not ready.";
+                lblImportStatus.Text      = "Database not ready.";
                 lblImportStatus.ForeColor = Color.Red;
                 return;
             }
 
-            btnImport.Enabled = false;
+            btnImport.Enabled         = false;
             lblImportStatus.ForeColor = Color.DarkBlue;
-            lblImportStatus.Text = "Importing…";
+            lblImportStatus.Text      = "Importing…";
 
             try
             {
                 var progress = new Progress<string>(msg =>
                 {
-                    lblImportStatus.Text = msg;
+                    lblImportStatus.Text      = msg;
                     lblImportStatus.ForeColor = Color.DarkBlue;
                 });
 
                 int count = await QaDatasetLoader.ImportFileAsync(path, _db, progress);
-                lblImportStatus.Text = $"Imported {count:N0} items from {Path.GetFileName(path)}.";
+                lblImportStatus.Text      = $"Imported {count:N0} items from {Path.GetFileName(path)}.";
                 lblImportStatus.ForeColor = Color.DarkGreen;
                 await RefreshCountsAsync();
             }
             catch (Exception ex)
             {
-                lblImportStatus.Text = $"Error: {ex.Message}";
+                lblImportStatus.Text      = $"Error: {ex.Message}";
                 lblImportStatus.ForeColor = Color.Red;
             }
             finally
@@ -164,10 +181,7 @@ namespace DemoApp
             if (_backfiller.IsRunning) return;
 
             EmbedderClassNew embedder;
-            try
-            {
-                embedder = new EmbedderClassNew(new RAGConfiguration());
-            }
+            try { embedder = new EmbedderClassNew(new RAGConfiguration()); }
             catch (Exception ex)
             {
                 AppendLine($"[Backfill] Cannot load BERT model: {ex.Message}");
@@ -175,16 +189,16 @@ namespace DemoApp
             }
 
             btnStartBackfill.Enabled = false;
-            btnStopBackfill.Enabled = true;
+            btnStopBackfill.Enabled  = true;
             AppendLine("[Backfill] Starting…");
 
             var progress = new Progress<(int Done, int Total)>(p =>
             {
                 if (p.Total > 0)
                 {
-                    pbarBackfill.Maximum = p.Total;
-                    pbarBackfill.Value = Math.Min(p.Done, p.Total);
-                    lblEmbedStatus.Text = $"Embedded: {p.Done:N0} / {p.Total:N0}";
+                    pbarBackfill.Maximum  = p.Total;
+                    pbarBackfill.Value    = Math.Min(p.Done, p.Total);
+                    lblEmbedStatus.Text   = $"Embedded: {p.Done:N0} / {p.Total:N0}";
                     lblEmbeddedCount.Text = $"({p.Done:N0} embedded)";
                 }
             });
@@ -195,7 +209,6 @@ namespace DemoApp
                 Invoke(() => ResetBackfillButtons());
             });
 
-            // Poll for completion
             _ = Task.Run(async () =>
             {
                 await _backfiller.WaitAsync();
@@ -218,7 +231,7 @@ namespace DemoApp
         private void ResetBackfillButtons()
         {
             btnStartBackfill.Enabled = true;
-            btnStopBackfill.Enabled = false;
+            btnStopBackfill.Enabled  = false;
         }
 
         // ── Benchmark run ─────────────────────────────────────────────────────
@@ -228,19 +241,21 @@ namespace DemoApp
             if (_db == null) return;
 
             var provider = cmbProvider.Text.Trim();
-            var model = txtModel.Text.Trim();
+            var model    = txtModel.Text.Trim();
             if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
             {
                 AppendLine("Error: Provider and Model are required.");
                 return;
             }
 
-            // Save settings on every run so they persist
             SaveCurrentSettings();
 
             btnRunBenchmark.Enabled = false;
-            btnSaveReport.Enabled = false;
-            _lastReport = null;
+            btnSaveReport.Enabled   = false;
+            _lastReport             = null;
+            ResetLiveStats();
+
+            _runCts = new CancellationTokenSource();
 
             try
             {
@@ -261,32 +276,35 @@ namespace DemoApp
 
                 var opts = new QaBenchmarkOptions
                 {
-                    MaxQuestions = (int)numQuestions.Value,
-                    Provider = provider,
-                    Model = model,
-                    Temperature = temperature,
-                    UseRagContext = chkUseRag.Checked,
+                    MaxQuestions      = (int)numQuestions.Value,
+                    Provider          = provider,
+                    Model             = model,
+                    Temperature       = temperature,
+                    UseRagContext     = chkUseRag.Checked,
                     SimilarContextCount = 3
                 };
 
-                var progress = new Progress<string>(msg => AppendLine(msg));
+                var progress = new Progress<BenchmarkProgressUpdate>(OnRunProgress);
 
-                AppendLine($"=== Starting benchmark: {opts.MaxQuestions} questions, provider={provider}, model={model}, temp={temperature:F2} ===");
+                AppendLine($"=== Starting benchmark: {opts.MaxQuestions} questions, model={model}, temp={temperature:F2} ===");
 
-                _lastReport = await QaBenchmarkRunner.RunAsync(opts, _db, session, progress);
+                _lastReport = await QaBenchmarkRunner.RunAsync(opts, _db, session, progress, _runCts.Token);
 
-                // Populate report metadata
-                _lastReport.Provider = provider;
-                _lastReport.Model = model;
-                _lastReport.Temperature = temperature;
-                _lastReport.CorrectThreshold = (double)numCorrectThresh.Value;
+                _lastReport.Provider                 = provider;
+                _lastReport.Model                    = model;
+                _lastReport.Temperature              = temperature;
+                _lastReport.CorrectThreshold         = (double)numCorrectThresh.Value;
                 _lastReport.PossiblyCorrectThreshold = (double)numPossCorrectThresh.Value;
                 _lastReport.DefinitelyWrongThreshold = (double)numDefWrongThresh.Value;
-                _lastReport.IndeterminateThreshold = (double)numIndetermThresh.Value;
+                _lastReport.IndeterminateThreshold   = (double)numIndetermThresh.Value;
 
                 rtbResults.AppendText(Environment.NewLine + _lastReport.FormatSummary());
                 rtbResults.ScrollToCaret();
                 btnSaveReport.Enabled = true;
+            }
+            catch (OperationCanceledException)
+            {
+                AppendLine("Run cancelled.");
             }
             catch (Exception ex)
             {
@@ -295,7 +313,212 @@ namespace DemoApp
             finally
             {
                 btnRunBenchmark.Enabled = true;
+                _runCts?.Dispose();
+                _runCts = null;
             }
+        }
+
+        private void OnRunProgress(BenchmarkProgressUpdate upd)
+        {
+            // Log each question line
+            if (!string.IsNullOrEmpty(upd.Message))
+                AppendLine(upd.Message);
+
+            // Update live stats bar
+            if (upd.Total > 0)
+            {
+                pbarRunProgress.Maximum = upd.Total;
+                pbarRunProgress.Value   = Math.Min(upd.Done, upd.Total);
+            }
+
+            if (upd.Done > 0)
+            {
+                lblLiveStats.Text = $"Q: {upd.Done}/{upd.Total}  " +
+                                    $"✓{upd.CorrectRate:F0}%  " +
+                                    $"?{upd.PossiblyCorrectRate:F0}%  " +
+                                    $"✗{upd.DefinitelyWrongRate:F0}%  " +
+                                    $"–{upd.IndeterminateRate:F0}%";
+            }
+        }
+
+        private void ResetLiveStats()
+        {
+            pbarRunProgress.Value = 0;
+            lblLiveStats.Text     = "Q: 0/0  ✓--%  ?--%  ✗--%  ---%";
+        }
+
+        // ── Auto-Tune ─────────────────────────────────────────────────────────
+
+        private async void btnAutoTune_Click(object sender, EventArgs e)
+        {
+            if (_db == null) return;
+
+            var provider = cmbProvider.Text.Trim();
+            if (string.IsNullOrWhiteSpace(provider))
+            {
+                AppendLine("Auto-Tune: Provider is required.");
+                return;
+            }
+
+            // Parse temperatures
+            var temps = ParseDoubleList(txtTuneTemps.Text);
+            if (temps.Count == 0)
+            {
+                AppendLine("Auto-Tune: No valid temperatures specified.");
+                return;
+            }
+
+            // Parse models — blank means use the current model only
+            var models = ParseStringList(txtTuneModels.Text);
+            if (models.Count == 0)
+                models.Add(txtModel.Text.Trim());
+
+            int qPerRun = (int)numTuneQuestions.Value;
+
+            SaveCurrentSettings();
+
+            btnAutoTune.Enabled     = false;
+            btnStopTune.Enabled     = true;
+            btnRunBenchmark.Enabled = false;
+
+            _tuneCts = new CancellationTokenSource();
+
+            try
+            {
+                var config = AiSettings.LoadFromFile("ai-settings.json");
+                AiSettings.ApplyToEnvironment(config);
+
+                // Build all (model, temperature) combinations
+                var combos = (from m in models from t in temps select (Model: m, Temp: t)).ToList();
+
+                AppendLine($"=== Auto-Tune: {combos.Count} combinations × {qPerRun} questions each ===");
+                AppendLine($"    Temperatures : {string.Join(", ", temps.Select(t => t.ToString("F2")))}");
+                AppendLine($"    Models       : {string.Join(", ", models)}");
+                AppendLine($"    Score metric : {cmbTuneScore.Text}");
+                AppendLine("");
+
+                double  bestScore  = double.MinValue;
+                string? bestModel  = null;
+                double  bestTemp   = 0;
+                int comboNum = 0;
+
+                foreach (var (model, temp) in combos)
+                {
+                    _tuneCts.Token.ThrowIfCancellationRequested();
+                    comboNum++;
+
+                    AppendLine($"  [{comboNum}/{combos.Count}] model={model}  temp={temp:F2}");
+
+                    try
+                    {
+                        var session = AiSessionBuilder
+                            .WithProvider(provider)
+                            .WithModel(model)
+                            .WithTemperature(temp)
+                            .WithMaxTokens(256)
+                            .WithSystemMessage(
+                                "You are a factual Q&A assistant. Answer questions concisely and directly. " +
+                                "Give only the answer — do not explain or add qualifications unless they are part of the answer.")
+                            .Build();
+
+                        var opts = new QaBenchmarkOptions
+                        {
+                            MaxQuestions        = qPerRun,
+                            Provider            = provider,
+                            Model               = model,
+                            Temperature         = temp,
+                            UseRagContext       = chkUseRag.Checked,
+                            SimilarContextCount = 3
+                        };
+
+                        // Silent progress — only update the live bar, no per-question log spam
+                        var capturedCombo = comboNum; // capture by value so the lambda is stable
+                        var progress = new Progress<BenchmarkProgressUpdate>(upd =>
+                        {
+                            if (upd.Total > 0)
+                            {
+                                pbarRunProgress.Maximum = upd.Total;
+                                pbarRunProgress.Value   = Math.Min(upd.Done, upd.Total);
+                            }
+                            if (upd.Done > 0)
+                            {
+                                lblLiveStats.Text = $"[Tune {capturedCombo}/{combos.Count}] " +
+                                                    $"Q: {upd.Done}/{upd.Total}  " +
+                                                    $"✓{upd.CorrectRate:F0}%  " +
+                                                    $"?{upd.PossiblyCorrectRate:F0}%  " +
+                                                    $"✗{upd.DefinitelyWrongRate:F0}%  " +
+                                                    $"–{upd.IndeterminateRate:F0}%";
+                            }
+                        });
+
+                        var report = await QaBenchmarkRunner.RunAsync(opts, _db, session, progress, _tuneCts.Token);
+                        double score = CalculateScore(report);
+
+                        string flag = score > bestScore ? " ← new best" : "";
+                        AppendLine($"         ✓{report.CorrectRate:F1}%  ?{report.PossiblyCorrectRate:F1}%  " +
+                                   $"✗{report.DefinitelyWrongRate:F1}%  –{report.IndeterminateRate:F1}%  " +
+                                   $"score={score:F2}{flag}");
+
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            bestModel = model;
+                            bestTemp  = temp;
+                        }
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        AppendLine($"         ERROR: {ex.Message}");
+                    }
+                }
+
+                AppendLine("");
+                AppendLine($"=== Auto-Tune complete ===");
+                if (bestModel != null)
+                {
+                    AppendLine($"    Best config  : model={bestModel}  temp={bestTemp:F2}  score={bestScore:F2}");
+                    AppendLine($"    Apply best?  → set Model to '{bestModel}' and Temp to {bestTemp:F2}");
+
+                    // Apply the best settings to the main run controls
+                    txtModel.Text         = bestModel;
+                    numTemperature.Value  = Clamp(0M, 2M, (decimal)bestTemp);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                AppendLine("Auto-Tune cancelled.");
+            }
+            catch (Exception ex)
+            {
+                AppendLine($"Auto-Tune error: {ex.Message}");
+            }
+            finally
+            {
+                btnAutoTune.Enabled     = true;
+                btnStopTune.Enabled     = false;
+                btnRunBenchmark.Enabled = true;
+                ResetLiveStats();
+                _tuneCts?.Dispose();
+                _tuneCts = null;
+            }
+        }
+
+        private void btnStopTune_Click(object sender, EventArgs e)
+        {
+            _tuneCts?.Cancel();
+            AppendLine("Auto-Tune: stopping after current run…");
+            btnStopTune.Enabled = false;
+        }
+
+        private double CalculateScore(QaBenchmarkReport report)
+        {
+            return cmbTuneScore.SelectedIndex switch
+            {
+                1 => report.CorrectRate + report.PossiblyCorrectRate,
+                2 => report.CorrectRate + 0.5 * report.PossiblyCorrectRate - 2.0 * report.DefinitelyWrongRate,
+                _ => report.CorrectRate
+            };
         }
 
         // ── Save report ───────────────────────────────────────────────────────
@@ -306,8 +529,8 @@ namespace DemoApp
 
             using var dlg = new SaveFileDialog
             {
-                Title = "Save Benchmark Report",
-                Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                Title    = "Save Benchmark Report",
+                Filter   = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
                 FileName = $"qa_benchmark_{_lastReport.RunId}_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
             };
 
@@ -334,8 +557,29 @@ namespace DemoApp
             rtbResults.ScrollToCaret();
         }
 
+        private static decimal Clamp(decimal min, decimal max, decimal value) =>
+            value < min ? min : value > max ? max : value;
+
+        private static List<double> ParseDoubleList(string csv) =>
+            csv.Split(',')
+               .Select(s => s.Trim())
+               .Where(s => !string.IsNullOrEmpty(s))
+               .Select(s => double.TryParse(s, System.Globalization.NumberStyles.Any,
+                                             System.Globalization.CultureInfo.InvariantCulture, out var v) ? (double?)v : null)
+               .Where(v => v.HasValue)
+               .Select(v => v!.Value)
+               .ToList();
+
+        private static List<string> ParseStringList(string csv) =>
+            csv.Split(',')
+               .Select(s => s.Trim())
+               .Where(s => !string.IsNullOrEmpty(s))
+               .ToList();
+
         private async void FormQaBenchmark_FormClosing(object sender, FormClosingEventArgs e)
         {
+            _runCts?.Cancel();
+            _tuneCts?.Cancel();
             _backfiller.Stop();
             await _backfiller.WaitAsync();
             _db?.Dispose();

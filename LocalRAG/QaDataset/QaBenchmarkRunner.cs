@@ -13,7 +13,7 @@ namespace LocalRAG.QaDataset
             QaBenchmarkOptions opts,
             QaDatasetDatabase db,
             IChatSession session,
-            IProgress<string>? progress = null,
+            IProgress<BenchmarkProgressUpdate>? progress = null,
             CancellationToken ct = default)
         {
             var runId = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
@@ -39,7 +39,11 @@ namespace LocalRAG.QaDataset
             var itemLookup = items.ToDictionary(x => x.Id);
 
             report.TotalRun = items.Count;
-            progress?.Report($"Starting run {runId} — {items.Count} questions.");
+            progress?.Report(new BenchmarkProgressUpdate
+            {
+                Message = $"Starting run {runId} — {items.Count} questions.",
+                Total = items.Count
+            });
 
             for (int i = 0; i < items.Count; i++)
             {
@@ -49,7 +53,6 @@ namespace LocalRAG.QaDataset
                 var preview = item.Question.Length > 60
                     ? item.Question[..60] + "…"
                     : item.Question;
-                progress?.Report($"[{i + 1}/{items.Count}] {preview}");
 
                 string? modelResponse = null;
                 QaOutcome outcome = QaOutcome.Indeterminate;
@@ -92,6 +95,18 @@ namespace LocalRAG.QaDataset
                     case QaOutcome.DefinitelyWrong: report.DefinitelyWrong++; break;
                     default:                        report.Indeterminate++;   break;
                 }
+
+                // Emit structured progress with running counts after every answer
+                progress?.Report(new BenchmarkProgressUpdate
+                {
+                    Message          = $"[{i + 1}/{items.Count}] {preview}",
+                    Done             = i + 1,
+                    Total            = items.Count,
+                    Correct          = report.Correct,
+                    PossiblyCorrect  = report.PossiblyCorrect,
+                    DefinitelyWrong  = report.DefinitelyWrong,
+                    Indeterminate    = report.Indeterminate
+                });
             }
 
             sw.Stop();

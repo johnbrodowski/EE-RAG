@@ -41,6 +41,8 @@ namespace DemoApp
             lblModel = new Label();
             cmbProvider = new ComboBox();
             lblProvider = new Label();
+            pbarRunProgress = new ProgressBar();
+            lblLiveStats = new Label();
 
             grpThresholds = new GroupBox();
             btnSaveSettings = new Button();
@@ -57,18 +59,32 @@ namespace DemoApp
             numCorrectThresh = new NumericUpDown();
             lblCorrectThresh = new Label();
 
+            grpTuning = new GroupBox();
+            btnStopTune = new Button();
+            btnAutoTune = new Button();
+            cmbTuneScore = new ComboBox();
+            lblTuneScore = new Label();
+            numTuneQuestions = new NumericUpDown();
+            lblTuneQuestions = new Label();
+            txtTuneModels = new TextBox();
+            lblTuneModels = new Label();
+            txtTuneTemps = new TextBox();
+            lblTuneTemps = new Label();
+
             rtbResults = new RichTextBox();
 
             grpImport.SuspendLayout();
             grpBackfill.SuspendLayout();
             grpRun.SuspendLayout();
             grpThresholds.SuspendLayout();
+            grpTuning.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numQuestions).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numTemperature).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numCorrectThresh).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numPossCorrectThresh).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numDefWrongThresh).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numIndetermThresh).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numTuneQuestions).BeginInit();
             SuspendLayout();
 
             // ── grpImport ──────────────────────────────────────────────────────
@@ -143,11 +159,12 @@ namespace DemoApp
                 lblProvider, cmbProvider, lblModel, txtModel,
                 lblTemperature, numTemperature,
                 lblQuestions, numQuestions, lblEmbeddedCount,
-                btnRunBenchmark, btnSaveReport, chkUseRag
+                btnRunBenchmark, btnSaveReport, chkUseRag,
+                pbarRunProgress, lblLiveStats
             });
             grpRun.Location = new Point(8, 154);
             grpRun.Name = "grpRun";
-            grpRun.Size = new Size(800, 76);
+            grpRun.Size = new Size(800, 100);
             grpRun.TabIndex = 2;
             grpRun.Text = "Run Benchmark";
 
@@ -228,6 +245,19 @@ namespace DemoApp
             btnSaveReport.Text = "Save Report…";
             btnSaveReport.Click += btnSaveReport_Click;
 
+            // Row 3: Live progress bar + running accuracy stats
+            pbarRunProgress.Location = new Point(8, 76);
+            pbarRunProgress.Name = "pbarRunProgress";
+            pbarRunProgress.Size = new Size(470, 16);
+            pbarRunProgress.TabIndex = 5;
+
+            lblLiveStats.AutoSize = true;
+            lblLiveStats.Font = new Font("Consolas", 8.25F);
+            lblLiveStats.ForeColor = Color.DimGray;
+            lblLiveStats.Location = new Point(486, 77);
+            lblLiveStats.Name = "lblLiveStats";
+            lblLiveStats.Text = "Q: 0/0  ✓--%  ?--%  ✗--%  ---%";
+
             // ── grpThresholds ──────────────────────────────────────────────────
             grpThresholds.Controls.AddRange(new Control[]
             {
@@ -237,7 +267,7 @@ namespace DemoApp
                 lblIndetermThresh, numIndetermThresh, lblPctIndeterm,
                 btnSaveSettings
             });
-            grpThresholds.Location = new Point(8, 238);
+            grpThresholds.Location = new Point(8, 262);
             grpThresholds.Name = "grpThresholds";
             grpThresholds.Size = new Size(800, 54);
             grpThresholds.TabIndex = 3;
@@ -321,25 +351,104 @@ namespace DemoApp
             btnSaveSettings.Text = "Save Settings";
             btnSaveSettings.Click += btnSaveSettings_Click;
 
+            // ── grpTuning ──────────────────────────────────────────────────────
+            grpTuning.Controls.AddRange(new Control[]
+            {
+                lblTuneTemps, txtTuneTemps,
+                lblTuneModels, txtTuneModels,
+                lblTuneQuestions, numTuneQuestions,
+                lblTuneScore, cmbTuneScore,
+                btnAutoTune, btnStopTune
+            });
+            grpTuning.Location = new Point(8, 324);
+            grpTuning.Name = "grpTuning";
+            grpTuning.Size = new Size(800, 76);
+            grpTuning.TabIndex = 4;
+            grpTuning.Text = "Auto-Tune";
+
+            // Row 1: Temperatures | Models
+            lblTuneTemps.AutoSize = true;
+            lblTuneTemps.Location = new Point(8, 24);
+            lblTuneTemps.Text = "Temperatures:";
+
+            txtTuneTemps.Location = new Point(92, 20);
+            txtTuneTemps.Name = "txtTuneTemps";
+            txtTuneTemps.Size = new Size(210, 23);
+            txtTuneTemps.Text = "0.0, 0.3, 0.5, 0.7, 1.0, 1.5";
+            txtTuneTemps.TabIndex = 0;
+
+            lblTuneModels.AutoSize = true;
+            lblTuneModels.Location = new Point(312, 24);
+            lblTuneModels.Text = "Models (csv):";
+
+            txtTuneModels.Location = new Point(398, 20);
+            txtTuneModels.Name = "txtTuneModels";
+            txtTuneModels.Size = new Size(294, 23);
+            txtTuneModels.TabIndex = 1;
+            txtTuneModels.PlaceholderText = "leave blank to use current model";
+
+            // Row 2: Questions | Score | Auto-Tune | Stop
+            lblTuneQuestions.AutoSize = true;
+            lblTuneQuestions.Location = new Point(8, 52);
+            lblTuneQuestions.Text = "Qs/run:";
+
+            numTuneQuestions.Location = new Point(58, 48);
+            numTuneQuestions.Name = "numTuneQuestions";
+            numTuneQuestions.Minimum = 5;
+            numTuneQuestions.Maximum = 500;
+            numTuneQuestions.Value = 10;
+            numTuneQuestions.Size = new Size(58, 23);
+            numTuneQuestions.TabIndex = 2;
+
+            lblTuneScore.AutoSize = true;
+            lblTuneScore.Location = new Point(126, 52);
+            lblTuneScore.Text = "Score by:";
+
+            cmbTuneScore.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbTuneScore.Items.AddRange(new object[]
+            {
+                "Correct %",
+                "Correct + Possibly Correct %",
+                "Composite (Correct + 0.5×Poss − 2×Wrong)"
+            });
+            cmbTuneScore.Location = new Point(186, 48);
+            cmbTuneScore.Name = "cmbTuneScore";
+            cmbTuneScore.Size = new Size(280, 23);
+            cmbTuneScore.TabIndex = 3;
+            cmbTuneScore.SelectedIndex = 0;
+
+            btnAutoTune.Location = new Point(590, 48);
+            btnAutoTune.Name = "btnAutoTune";
+            btnAutoTune.Size = new Size(100, 25);
+            btnAutoTune.Text = "Auto-Tune";
+            btnAutoTune.Click += btnAutoTune_Click;
+
+            btnStopTune.Enabled = false;
+            btnStopTune.Location = new Point(700, 48);
+            btnStopTune.Name = "btnStopTune";
+            btnStopTune.Size = new Size(92, 25);
+            btnStopTune.Text = "Stop";
+            btnStopTune.Click += btnStopTune_Click;
+
             // ── rtbResults ─────────────────────────────────────────────────────
             rtbResults.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             rtbResults.BackColor = Color.FromArgb(30, 30, 30);
             rtbResults.ForeColor = Color.LightGray;
             rtbResults.Font = new Font("Consolas", 9F);
-            rtbResults.Location = new Point(8, 300);
+            rtbResults.Location = new Point(8, 408);
             rtbResults.Name = "rtbResults";
             rtbResults.ReadOnly = true;
             rtbResults.ScrollBars = RichTextBoxScrollBars.Vertical;
-            rtbResults.Size = new Size(800, 364);
-            rtbResults.TabIndex = 4;
+            rtbResults.Size = new Size(800, 340);
+            rtbResults.TabIndex = 5;
             rtbResults.Text = "";
 
             // ── Form ───────────────────────────────────────────────────────────
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(820, 672);
-            Controls.AddRange(new Control[] { grpImport, grpBackfill, grpRun, grpThresholds, rtbResults });
-            MinimumSize = new Size(836, 710);
+            ClientSize = new Size(820, 756);
+            Controls.AddRange(new Control[] { grpImport, grpBackfill, grpRun, grpThresholds, grpTuning, rtbResults });
+            MinimumSize = new Size(836, 794);
             Name = "FormQaBenchmark";
             Text = "QA Dataset Benchmark";
             Load += FormQaBenchmark_Load;
@@ -353,12 +462,15 @@ namespace DemoApp
             grpRun.PerformLayout();
             grpThresholds.ResumeLayout(false);
             grpThresholds.PerformLayout();
+            grpTuning.ResumeLayout(false);
+            grpTuning.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numQuestions).EndInit();
             ((System.ComponentModel.ISupportInitialize)numTemperature).EndInit();
             ((System.ComponentModel.ISupportInitialize)numCorrectThresh).EndInit();
             ((System.ComponentModel.ISupportInitialize)numPossCorrectThresh).EndInit();
             ((System.ComponentModel.ISupportInitialize)numDefWrongThresh).EndInit();
             ((System.ComponentModel.ISupportInitialize)numIndetermThresh).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numTuneQuestions).EndInit();
             ResumeLayout(false);
         }
 
@@ -390,6 +502,8 @@ namespace DemoApp
         private Button btnRunBenchmark;
         private Button btnSaveReport;
         private CheckBox chkUseRag;
+        private ProgressBar pbarRunProgress;
+        private Label lblLiveStats;
 
         private GroupBox grpThresholds;
         private Label lblCorrectThresh;
@@ -405,6 +519,18 @@ namespace DemoApp
         private NumericUpDown numIndetermThresh;
         private Label lblPctIndeterm;
         private Button btnSaveSettings;
+
+        private GroupBox grpTuning;
+        private Label lblTuneTemps;
+        private TextBox txtTuneTemps;
+        private Label lblTuneModels;
+        private TextBox txtTuneModels;
+        private Label lblTuneQuestions;
+        private NumericUpDown numTuneQuestions;
+        private Label lblTuneScore;
+        private ComboBox cmbTuneScore;
+        private Button btnAutoTune;
+        private Button btnStopTune;
 
         private RichTextBox rtbResults;
     }
