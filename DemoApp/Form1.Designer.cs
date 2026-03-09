@@ -53,7 +53,7 @@
             // btnSearch
             // 
             btnSearch.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnSearch.Location = new Point(813, 26);
+            btnSearch.Location = new Point(672, 26);
             btnSearch.Name = "btnSearch";
             btnSearch.Size = new Size(75, 26);
             btnSearch.TabIndex = 0;
@@ -64,20 +64,22 @@
             // txtResult
             // 
             txtResult.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            txtResult.BackColor = Color.Silver;
             txtResult.Location = new Point(5, 92);
             txtResult.Multiline = true;
             txtResult.Name = "txtResult";
             txtResult.ScrollBars = ScrollBars.Vertical;
-            txtResult.Size = new Size(883, 520);
+            txtResult.Size = new Size(742, 153);
             txtResult.TabIndex = 1;
             // 
             // txtQuery
             // 
             txtQuery.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtQuery.BackColor = Color.Silver;
             txtQuery.Font = new Font("Segoe UI", 10F);
             txtQuery.Location = new Point(6, 28);
             txtQuery.Name = "txtQuery";
-            txtQuery.Size = new Size(804, 25);
+            txtQuery.Size = new Size(663, 25);
             txtQuery.TabIndex = 2;
             txtQuery.Text = "Simple query that might have some matches in the rag database.";
             // 
@@ -86,7 +88,7 @@
             menuStrip1.Items.AddRange(new ToolStripItem[] { fileToolStripMenuItem, ragToolStripMenuItem, testToolStripMenuItem });
             menuStrip1.Location = new Point(0, 0);
             menuStrip1.Name = "menuStrip1";
-            menuStrip1.Size = new Size(893, 24);
+            menuStrip1.Size = new Size(752, 24);
             menuStrip1.TabIndex = 3;
             menuStrip1.Text = "menuStrip1";
             // 
@@ -181,6 +183,7 @@
             // 
             // txtModel
             // 
+            txtModel.BackColor = Color.Silver;
             txtModel.Location = new Point(232, 59);
             txtModel.Name = "txtModel";
             txtModel.Size = new Size(220, 23);
@@ -200,7 +203,7 @@
             // btnAskAI
             // 
             btnAskAI.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnAskAI.Location = new Point(746, 58);
+            btnAskAI.Location = new Point(605, 58);
             btnAskAI.Name = "btnAskAI";
             btnAskAI.Size = new Size(142, 26);
             btnAskAI.TabIndex = 7;
@@ -212,7 +215,8 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(893, 621);
+            BackColor = Color.Silver;
+            ClientSize = new Size(752, 254);
             Controls.Add(btnAskAI);
             Controls.Add(chkSilentMode);
             Controls.Add(txtModel);
