@@ -31,7 +31,7 @@ namespace LocalRAG
         /// <summary>
         /// Path to the BERT vocabulary file (vocab.txt). Should match the BERT model being used.
         /// </summary>
-        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("Vocabularies", "base_uncased_large.txt"));
+        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("Vocabularies", "base_uncased.txt"));
         public int MaxSequenceLength { get; set; } = 512;
         public int WordsPerString { get; set; } = 40;
         public double OverlapPercentage { get; set; } = 15;
@@ -40,8 +40,8 @@ namespace LocalRAG
         public int MaxQueueSize { get; set; } = 1000;
         public int MaxRetryAttempts { get; set; } = 3;
         public int RetryDelayMs { get; set; } = 1000;
-        public int InterOpNumThreads { get; set; } = 32;
-        public int IntraOpNumThreads { get; set; } = 2;
+        public int InterOpNumThreads { get; set; } = 9;
+        public int IntraOpNumThreads { get; set; } = 9;
  
         public int MaxCacheItems { get; set; } = 10000;
         public long CacheItemSizeThreshold { get; set; } = 1024 * 1024; // 1MB
