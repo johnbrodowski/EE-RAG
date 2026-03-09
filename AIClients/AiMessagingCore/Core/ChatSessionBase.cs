@@ -182,6 +182,16 @@ public abstract class ChatSessionBase : IChatSession
         return assistantMsg;
     }
 
+    public void TrimLastTurn()
+    {
+        if (_messages.Count >= 2 &&
+            _messages[^1].Role == ChatRole.Assistant &&
+            _messages[^2].Role == ChatRole.User)
+        {
+            _messages.RemoveRange(_messages.Count - 2, 2);
+        }
+    }
+
     public virtual ValueTask SwitchModelAsync(string model, CancellationToken cancellationToken = default)
     {
         Model = model;

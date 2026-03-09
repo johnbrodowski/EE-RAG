@@ -97,7 +97,11 @@ namespace LocalRAG
             var firstResponse = firstMsg.Content;
 
             // ── Step 6: Parse RETRIEVE command ───────────────────────────────
-            var electedIds = ParseRetrieveIds(firstResponse);
+            // Constrain to surfaced candidates — prevents a malformed or prompt-injected
+            // model response from fetching unrelated rows by arbitrary ID.
+            var electedIds = ParseRetrieveIds(firstResponse)
+                .Where(id => candidateIds.Contains(id))
+                .ToList();
 
             string finalResponse;
             var electedHashes = new List<string>();
@@ -109,14 +113,17 @@ namespace LocalRAG
             }
             else
             {
-                // ── Step 7: Fetch only the elected chunks ────────────────────
-                var electedChunks = new List<FeedbackDatabaseValues>();
-                foreach (var id in electedIds)
-                {
-                    var chunk = await db.GetFeedbackDataByIdAsync(id);
-                    if (chunk != null)
-                        electedChunks.Add(chunk);
-                }
+                // Phase-1 added a (user, RETRIEVE) pair to persistent history.
+                // Remove it so only the final answer turn survives.
+                session.TrimLastTurn();
+
+                // ── Step 7: Fetch elected chunks in parallel ─────────────────
+                var chunkResults = await Task.WhenAll(
+                    electedIds.Select(id => db.GetFeedbackDataByIdAsync(id)));
+                var electedChunks = chunkResults
+                    .Where(c => c != null)
+                    .Cast<FeedbackDatabaseValues>()
+                    .ToList();
 
                 // Compute 8-hex hash for each elected chunk.
                 foreach (var chunk in electedChunks)

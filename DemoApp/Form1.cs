@@ -58,8 +58,6 @@ namespace DemoApp
 
             foreach (var (result, index) in sortedResults.Select((result, index) => (result, index + 1)))
             {
-                AppendSection(sb, "Users Request", result.Request);
-
                 sb.AppendLine().AppendLine($"Results: {index} - Similarity {result.Similarity:F5}");
 
                 AppendSection(sb, "Users Request", result.Request);
@@ -159,6 +157,9 @@ namespace DemoApp
                 var userMessage = txtQuery.Text;
                 var requestId = Guid.NewGuid().ToString();
                 var silentMode = chkSilentMode.Checked;
+
+                // Insert the request row so the two-phase audit writes have a row to UPDATE.
+                await db.AddRequestToEmbeddingDatabaseAsync(requestId, userMessage, embed: false);
 
                 var result = await EERagPipeline.RunPipelineAsync(
                     userMessage,

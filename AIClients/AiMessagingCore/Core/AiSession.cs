@@ -57,6 +57,8 @@ public sealed class AiSession : IChatSession
         CancellationToken cancellationToken = default)
         => _inner.SendWithTransientBackgroundAsync(userMessage, transientBackground, overrides, cancellationToken);
 
+    public void TrimLastTurn() => _inner.TrimLastTurn();
+
     public ValueTask SwitchModelAsync(string model, CancellationToken cancellationToken = default)
         => _inner.SwitchModelAsync(model, cancellationToken);
 

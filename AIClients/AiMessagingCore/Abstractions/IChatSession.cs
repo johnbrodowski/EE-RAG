@@ -61,4 +61,11 @@ public interface IChatSession
         string transientBackground,
         RequestOverrides? overrides = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes the last user+assistant turn from persistent history.
+    /// Used by EE-RAG to discard a Phase-1 RETRIEVE response before Phase-2,
+    /// so only the final answer appears in conversation history.
+    /// </summary>
+    void TrimLastTurn();
 }

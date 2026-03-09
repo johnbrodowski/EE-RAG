@@ -424,10 +424,14 @@ END;
             if (string.IsNullOrWhiteSpace(searchText))
                 return new List<FeedbackDatabaseValues>();
 
-            // Get results from multiple search methods
-            var ftsResults = await SearchWithFTSAsync(searchText, topK, searchLevel);
-            var lshResults = await SearchWithLSHAsync(searchText, topK, minimumSimilarity);
-            var memoryResults = await SearchMemoryBasedAsync(searchText, topK);
+            // Run all three retrieval strategies concurrently.
+            var ftsTask    = SearchWithFTSAsync(searchText, topK, searchLevel);
+            var lshTask    = SearchWithLSHAsync(searchText, topK, minimumSimilarity);
+            var memoryTask = SearchMemoryBasedAsync(searchText, topK);
+            await Task.WhenAll(ftsTask, lshTask, memoryTask);
+            var ftsResults    = ftsTask.Result;
+            var lshResults    = lshTask.Result;
+            var memoryResults = memoryTask.Result;
 
             // Combine and deduplicate results
             var combinedResults = new Dictionary<string, FeedbackDatabaseValues>();
