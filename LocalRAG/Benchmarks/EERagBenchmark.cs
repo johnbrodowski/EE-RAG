@@ -146,7 +146,8 @@ namespace LocalRAG.Benchmarks
                     ActualRetrieval   = result.RetrievalOccurred,
                     Duration          = caseSw.Elapsed,
                     AnswerHint        = benchCase.ExpectedAnswerHint,
-                    AnswerHintMatched = hintMatched
+                    AnswerHintMatched = hintMatched,
+                    FirstResponse     = result.FirstResponse
                 });
             }
 

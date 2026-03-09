@@ -81,6 +81,7 @@ namespace LocalRAG.Benchmarks
         public TimeSpan Duration { get; set; }
         public string? AnswerHint { get; set; }
         public bool AnswerHintMatched { get; set; }
+        public string FirstResponse { get; set; } = string.Empty;
     }
 
     public class BenchmarkReport
@@ -121,6 +122,16 @@ namespace LocalRAG.Benchmarks
                     $"  {r.CaseId,-8} F1={r.F1:F2}  P={r.Precision:F2}  R={r.Recall:F2}" +
                     $"  CandRec={r.CandidateRecall:F2}  Ret={r.ActualRetrieval}  {hint}");
                 sb.AppendLine($"           Query: {r.Query}");
+                sb.AppendLine($"           Expected IDs: [{string.Join(", ", r.ExpectedIds)}]" +
+                    $"  Surfaced: [{string.Join(", ", r.SurfacedIds)}]" +
+                    $"  Elected: [{string.Join(", ", r.ElectedIds)}]");
+                if (!string.IsNullOrEmpty(r.FirstResponse))
+                {
+                    var preview = r.FirstResponse.Length > 120
+                        ? r.FirstResponse[..120] + "..."
+                        : r.FirstResponse;
+                    sb.AppendLine($"           Model said: {preview.Replace("\n", " ").Replace("\r", "")}");
+                }
             }
             return sb.ToString();
         }
