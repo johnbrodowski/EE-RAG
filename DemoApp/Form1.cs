@@ -408,6 +408,12 @@ namespace DemoApp
             }
         }
 
+        private void qaDatasetBenchmarkToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var form = new FormQaBenchmark();
+            form.Show(this);
+        }
+
         private async void missingToolStripMenuItem_Click(object sender, EventArgs e)
         {
             await RunBackfillAsync("missing");
