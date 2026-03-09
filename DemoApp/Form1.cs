@@ -138,6 +138,11 @@ namespace DemoApp
                     return;
                 }
 
+
+                var config = AiSettings.LoadFromFile("ai-settings.json");
+                AiSettings.ApplyToEnvironment(config);
+
+
                 var session = AiSessionBuilder
                     .WithProvider(provider)
                     .WithModel(model)
@@ -319,6 +324,9 @@ namespace DemoApp
                     dataset, db, generateEmbeddings: true, progress: progress);
 
                 txtResult.AppendText($"Seeded {slugToId.Count} entries.\r\n");
+
+                var config = AiSettings.LoadFromFile("ai-settings.json");
+                AiSettings.ApplyToEnvironment(config);
 
                 var session = AiSessionBuilder
                     .WithProvider(provider)
