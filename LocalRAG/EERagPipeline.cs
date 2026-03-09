@@ -211,19 +211,37 @@ namespace LocalRAG
             if (string.IsNullOrWhiteSpace(response))
                 return [];
 
-            // Match RETRIEVE followed by one or more integers (space or comma separated).
+            // Primary: RETRIEVE followed by one or more integers (space or comma separated).
             var match = Regex.Match(
                 response,
                 @"RETRIEVE\s+([\d\s,]+)",
                 RegexOptions.IgnoreCase);
 
-            if (!match.Success)
-                return [];
+            if (match.Success)
+                return Regex.Matches(match.Groups[1].Value, @"\d+")
+                    .Select(m => int.Parse(m.Value))
+                    .Distinct()
+                    .ToList();
 
-            return Regex.Matches(match.Groups[1].Value, @"\d+")
-                .Select(m => int.Parse(m.Value))
-                .Distinct()
-                .ToList();
+            // Fallback: model described an entry as relevant using [ID:N] notation but didn't
+            // use the RETRIEVE keyword.  Only activate when the response clearly indicates
+            // intent to retrieve (mentions "relevant", "retrieve", "most relevant", etc.).
+            bool indicatesRetrieval = Regex.IsMatch(
+                response,
+                @"\b(relevant|retrieve|elect|useful|helpful|applies|related)\b",
+                RegexOptions.IgnoreCase);
+
+            if (indicatesRetrieval)
+            {
+                var ids = Regex.Matches(response, @"\[ID:(\d+)\]", RegexOptions.IgnoreCase)
+                    .Select(m => int.Parse(m.Groups[1].Value))
+                    .Distinct()
+                    .ToList();
+                if (ids.Count > 0)
+                    return ids;
+            }
+
+            return [];
         }
 
         // ── Utility: embedding hash (Layer 3) ────────────────────────────────

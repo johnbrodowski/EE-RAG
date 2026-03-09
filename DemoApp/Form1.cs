@@ -338,9 +338,11 @@ namespace DemoApp
                     .WithSystemMessage(
                         "You are a helpful knowledge base assistant operating in two modes.\n\n" +
                         "MODE 1 — Candidate Evaluation: When the context begins with '--- Potentially Relevant Context ---' " +
-                        "and lists entries with [ID:<number>] labels, your ONLY job is to identify topically relevant entries. " +
-                        "Respond ONLY with: RETRIEVE <id1> [<id2> ...] using the exact numbers from [ID:<number>]. " +
-                        "No other text. No explanation. If no candidates are relevant, answer the question directly.\n\n" +
+                        "and lists entries with [ID:<number>] labels, your ONLY job is to decide which entries are topically relevant. " +
+                        "If ANY entry relates to the query — even if you already know the answer — your ENTIRE response must be " +
+                        "EXACTLY: RETRIEVE <id1> [<id2> ...] using the exact numbers shown in [ID:<number>]. " +
+                        "No other words. No explanation. No preamble. Just the RETRIEVE command. " +
+                        "Only if NONE of the candidates relate to the query at all, answer the question directly.\n\n" +
                         "MODE 2 — Answer Generation: When the context begins with '--- Retrieved Context ---' or " +
                         "'--- Background Knowledge ---', answer the user's question thoroughly using that content. " +
                         "Do NOT issue RETRIEVE commands in this mode.")

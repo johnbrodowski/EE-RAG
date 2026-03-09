@@ -1432,10 +1432,12 @@ WHERE RequestID = @RequestID";
 
             const string query = @"
 SELECT e.* FROM embeddings e
-INNER JOIN embeddings_fts fts ON e.Id = fts.rowid
-WHERE embeddings_fts MATCH @SearchText
-ORDER BY rank
-LIMIT @TopK";
+WHERE e.Id IN (
+    SELECT rowid FROM embeddings_fts
+    WHERE embeddings_fts MATCH @SearchText
+    ORDER BY rank
+    LIMIT @TopK
+)";
 
             using var connection = await GetConnectionAsync();
             using var command = new SqliteCommand(query, connection);
