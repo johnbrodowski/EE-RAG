@@ -181,8 +181,8 @@ namespace LocalRAG
             sb.AppendLine("--- Potentially Relevant Context ---");
             sb.AppendLine("Each entry below has a DATABASE ID shown as [ID:<number>].");
             sb.AppendLine("To retrieve an entry's full content, respond with EXACTLY: RETRIEVE <number>");
-            sb.AppendLine("You MUST use the exact number from [ID:<number>] — do not renumber the entries yourself.");
-            sb.AppendLine("Example: if you see [ID:53] and [ID:57], respond: RETRIEVE 53 57");
+            sb.AppendLine("You MUST use the exact number shown in [ID:<number>] — do not renumber the entries yourself.");
+            sb.AppendLine("For multiple entries: RETRIEVE <id1> <id2> (space-separated).");
             sb.AppendLine("You are not required to retrieve any entry.");
             sb.AppendLine("---");
 

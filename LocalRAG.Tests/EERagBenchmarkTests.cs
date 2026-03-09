@@ -188,8 +188,8 @@ public class EERagBenchmarkTests
                         "You are a knowledge base relevance classifier. " +
                         "Candidate entries are shown with [ID:<number>] labels. " +
                         "If ANY entry is topically related to the query — even if you already know the answer — " +
-                        "respond with EXACTLY: RETRIEVE <number> (using the exact [ID:<number>] value). " +
-                        "Multiple IDs: RETRIEVE 53 57. " +
+                        "respond with EXACTLY: RETRIEVE <number> where <number> is the ID from [ID:<number>]. " +
+                        "Multiple IDs: space-separate them, e.g. RETRIEVE <id1> <id2>. " +
                         "No other text. No explanation. Just the RETRIEVE command. " +
                         "Only answer the question directly if NONE of the candidates relate to it at all.")
                     .Build();
