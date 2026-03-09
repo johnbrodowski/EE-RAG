@@ -34,7 +34,17 @@ public sealed class AnthropicChatSession : ChatSessionBase
 
         var model    = overrides?.Model ?? Model;
         var baseUrl  = Environment.GetEnvironmentVariable("ANTHROPIC_BASE_URL") ?? "https://api.anthropic.com/v1";
-        var sysPrompt = messages.FirstOrDefault(x => x.Role == ChatRole.System)?.Content;
+
+        // Concatenate ALL system-role messages so that transient injections (e.g. RAG candidate
+        // headers appended by SendWithTransientBackgroundAsync) are not silently dropped.
+        // The Anthropic API accepts a single string for `system`; joining with a double newline
+        // preserves the logical boundary between the session prompt and any injected context.
+        var systemParts = messages
+            .Where(x => x.Role == ChatRole.System)
+            .Select(x => x.Content)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .ToList();
+        var sysPrompt = systemParts.Count > 0 ? string.Join("\n\n", systemParts) : null;
 
         var request = new
         {
