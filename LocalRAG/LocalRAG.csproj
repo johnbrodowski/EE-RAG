@@ -20,4 +20,8 @@
     <ProjectReference Include="..\AIClients\AiMessagingCore\AiMessagingCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="BenchmarkData\eedag_benchmark_v1.json" />
+  </ItemGroup>
+
 </Project>

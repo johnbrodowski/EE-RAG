@@ -2,6 +2,7 @@ using AiMessagingCore.Configuration;
 using AiMessagingCore.Core;
 
 using LocalRAG;
+using LocalRAG.Benchmarks;
 
 using System.Diagnostics;
 using System.Text;
@@ -262,6 +263,90 @@ namespace DemoApp
             finally
             {
                 runTestsToolStripMenuItem.Enabled = true;
+            }
+        }
+
+        private async void benchmarkToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            benchmarkToolStripMenuItem.Enabled = false;
+            txtResult.Text = "Loading benchmark dataset...\r\n";
+
+            try
+            {
+                var provider = cmbProvider.Text.Trim();
+                var model    = txtModel.Text.Trim();
+
+                if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
+                {
+                    txtResult.Text = "Error: Provider and Model must be specified.";
+                    return;
+                }
+
+                var dataset = EERagBenchmark.LoadEmbeddedDataset();
+                txtResult.Text += $"Dataset: {dataset.Name} — {dataset.KnowledgeEntries.Count} entries, " +
+                                  $"{dataset.Cases.Count} cases.\r\n";
+
+                var options = new BenchmarkOptions
+                {
+                    TopK              = 5,
+                    SilentMode        = chkSilentMode.Checked,
+                    SeedFreshDatabase = true
+                };
+
+                if (options.SeedFreshDatabase)
+                {
+                    var confirm = MessageBox.Show(
+                        "Run Benchmark will CLEAR all current database records and seed benchmark data.\n\nContinue?",
+                        "Confirm Benchmark Run",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (confirm != DialogResult.Yes)
+                    {
+                        txtResult.Text = "Benchmark cancelled.";
+                        return;
+                    }
+
+                    txtResult.AppendText("Clearing database...\r\n");
+                    await db.ClearAllDataAsync();
+                }
+
+                var progress = new Progress<string>(msg =>
+                    this.Invoke(() => txtResult.AppendText(msg + "\r\n")));
+
+                txtResult.AppendText("Seeding database with benchmark knowledge...\r\n");
+                var slugToId = await EERagBenchmark.SeedDatabaseAsync(
+                    dataset, db, generateEmbeddings: true, progress: progress);
+
+                txtResult.AppendText($"Seeded {slugToId.Count} entries.\r\n");
+
+                var session = AiSessionBuilder
+                    .WithProvider(provider)
+                    .WithModel(model)
+                    .WithMaxTokens(2048)
+                    .WithSystemMessage(
+                        "You are a helpful assistant. " +
+                        "When you see a list of candidate context entries under '--- Potentially Relevant Context ---', " +
+                        "evaluate them and, if any are relevant to the query, respond ONLY with a RETRIEVE command " +
+                        "(e.g. RETRIEVE 7  or  RETRIEVE 3 7 12). " +
+                        "If none are relevant, answer the question directly without a RETRIEVE command.")
+                    .Build();
+
+                txtResult.AppendText("Running benchmark cases...\r\n");
+                var report = await EERagBenchmark.RunAsync(
+                    dataset, slugToId, session, db,
+                    options: options,
+                    progress: progress);
+
+                txtResult.Text = report.FormatSummary().Replace("\n", "\r\n");
+            }
+            catch (Exception ex)
+            {
+                txtResult.Text = $"Benchmark error: {ex.Message}\r\n{ex.StackTrace}";
+            }
+            finally
+            {
+                benchmarkToolStripMenuItem.Enabled = true;
             }
         }
 

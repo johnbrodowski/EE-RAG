@@ -40,6 +40,7 @@
             generateMockDataToolStripMenuItem = new ToolStripMenuItem();
             testToolStripMenuItem = new ToolStripMenuItem();
             runTestsToolStripMenuItem = new ToolStripMenuItem();
+            benchmarkToolStripMenuItem = new ToolStripMenuItem();
             lblProvider = new Label();
             cmbProvider = new ComboBox();
             lblModel = new Label();
@@ -132,7 +133,7 @@
             //
             // testToolStripMenuItem
             //
-            testToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { runTestsToolStripMenuItem });
+            testToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { runTestsToolStripMenuItem, benchmarkToolStripMenuItem });
             testToolStripMenuItem.Name = "testToolStripMenuItem";
             testToolStripMenuItem.Size = new Size(40, 20);
             testToolStripMenuItem.Text = "Test";
@@ -143,6 +144,13 @@
             runTestsToolStripMenuItem.Size = new Size(124, 22);
             runTestsToolStripMenuItem.Text = "Run Tests";
             runTestsToolStripMenuItem.Click += runTestsToolStripMenuItem_Click;
+            //
+            // benchmarkToolStripMenuItem
+            //
+            benchmarkToolStripMenuItem.Name = "benchmarkToolStripMenuItem";
+            benchmarkToolStripMenuItem.Size = new Size(124, 22);
+            benchmarkToolStripMenuItem.Text = "Run Benchmark";
+            benchmarkToolStripMenuItem.Click += benchmarkToolStripMenuItem_Click;
             //
             // lblProvider
             //
@@ -237,6 +245,7 @@
         private ToolStripMenuItem generateMockDataToolStripMenuItem;
         private ToolStripMenuItem testToolStripMenuItem;
         private ToolStripMenuItem runTestsToolStripMenuItem;
+        private ToolStripMenuItem benchmarkToolStripMenuItem;
         private Label lblProvider;
         private ComboBox cmbProvider;
         private Label lblModel;
