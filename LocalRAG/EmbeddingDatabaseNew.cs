@@ -1424,8 +1424,11 @@ WHERE RequestID = @RequestID";
             if (searchWords.Length == 0)
                 return results;
 
-            // Build FTS5 query
-            var ftsQuery = string.Join(" OR ", searchWords);
+            // Build FTS5 query - wrap each term in double quotes so FTS5 treats
+            // them as literal tokens rather than interpreting hyphens/operators
+            // (e.g. "insert-or-update" would otherwise be parsed as insert OR or OR update,
+            // causing "no such column: or" errors)
+            var ftsQuery = string.Join(" OR ", searchWords.Select(w => $"\"{w}\""));
 
             const string query = @"
 SELECT e.* FROM embeddings e
