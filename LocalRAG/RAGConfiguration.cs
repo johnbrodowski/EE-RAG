@@ -26,15 +26,16 @@ namespace LocalRAG
         /// Path to the ONNX BERT model file. Download a BERT model in ONNX format and update this path.
         /// Example: https://huggingface.co/models?library=onnx&search=bert
         /// </summary>
-        public string ModelPath { get; set; } = GetAppPath(Path.Combine("onnxBERT", "model2.onnx"));
+        public string ModelPath { get; set; } = GetAppPath(Path.Combine("all-MiniLM-L6-v2-ONNX", "model.onnx"));
+        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("all-MiniLM-L6-v2-ONNX", "vocab.txt"));
 
         /// <summary>
         /// Path to the BERT vocabulary file (vocab.txt). Should match the BERT model being used.
         /// </summary>
-        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("Vocabularies", "base_uncased_large.txt"));
-        public int MaxSequenceLength { get; set; } = 512;
+        //public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("Vocabularies", "base_uncased_large.txt"));
+        public int MaxSequenceLength { get; set; } = 128;
         public int WordsPerString { get; set; } = 40;
-        public double OverlapPercentage { get; set; } = 15;
+        public double OverlapPercentage { get; set; } = 25;
         public int NumberOfHashFunctions { get; set; } = 8;
         public int NumberOfHashTables { get; set; } = 10;
         public int MaxQueueSize { get; set; } = 1000;
