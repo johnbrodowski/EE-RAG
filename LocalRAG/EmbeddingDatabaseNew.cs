@@ -1434,6 +1434,7 @@ WHERE RequestID = @RequestID";
 SELECT e.* FROM embeddings e
 INNER JOIN embeddings_fts fts ON e.Id = fts.rowid
 WHERE embeddings_fts MATCH @SearchText
+ORDER BY rank
 LIMIT @TopK";
 
             using var connection = await GetConnectionAsync();

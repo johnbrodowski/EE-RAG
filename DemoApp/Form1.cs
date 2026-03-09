@@ -336,13 +336,14 @@ namespace DemoApp
                     .WithModel(model)
                     .WithMaxTokens(512)
                     .WithSystemMessage(
-                        "You are a knowledge base relevance classifier. " +
-                        "Candidate entries are shown with [ID:<number>] labels. " +
-                        "If ANY entry is topically related to the query — even if you already know the answer — " +
-                        "respond with EXACTLY: RETRIEVE <number> where <number> is the ID from [ID:<number>]. " +
-                        "Multiple IDs: space-separate them, e.g. RETRIEVE <id1> <id2>. " +
-                        "No other text. No explanation. Just the RETRIEVE command. " +
-                        "Only answer the question directly if NONE of the candidates relate to it at all.")
+                        "You are a helpful knowledge base assistant operating in two modes.\n\n" +
+                        "MODE 1 — Candidate Evaluation: When the context begins with '--- Potentially Relevant Context ---' " +
+                        "and lists entries with [ID:<number>] labels, your ONLY job is to identify topically relevant entries. " +
+                        "Respond ONLY with: RETRIEVE <id1> [<id2> ...] using the exact numbers from [ID:<number>]. " +
+                        "No other text. No explanation. If no candidates are relevant, answer the question directly.\n\n" +
+                        "MODE 2 — Answer Generation: When the context begins with '--- Retrieved Context ---' or " +
+                        "'--- Background Knowledge ---', answer the user's question thoroughly using that content. " +
+                        "Do NOT issue RETRIEVE commands in this mode.")
                     .Build();
 
                 txtResult.AppendText("Running benchmark cases...\r\n");
