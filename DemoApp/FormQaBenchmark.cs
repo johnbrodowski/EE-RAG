@@ -11,6 +11,7 @@ namespace DemoApp
         private QaDatasetDatabase? _db;
         private readonly QaEmbeddingBackfiller _backfiller = new();
         private QaBenchmarkReport? _lastReport;
+        private BenchmarkSettings _settings = new();
 
         private static string DefaultDbPath =>
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
@@ -23,7 +24,50 @@ namespace DemoApp
 
         private async void FormQaBenchmark_Load(object sender, EventArgs e)
         {
+            LoadSettings();
             await OpenDatabaseAsync(DefaultDbPath);
+        }
+
+        // ── Settings ──────────────────────────────────────────────────────────
+
+        private void LoadSettings()
+        {
+            _settings = BenchmarkSettings.Load();
+
+            // Restore run controls
+            var providerIdx = cmbProvider.Items.IndexOf(_settings.Provider);
+            cmbProvider.SelectedIndex = providerIdx >= 0 ? providerIdx : 0;
+            txtModel.Text = _settings.Model;
+            numQuestions.Value = Math.Max(numQuestions.Minimum,
+                                 Math.Min(numQuestions.Maximum, _settings.MaxQuestions));
+            numTemperature.Value = (decimal)Math.Max(0, Math.Min(2, _settings.Temperature));
+            chkUseRag.Checked = _settings.UseRag;
+
+            // Restore thresholds
+            numCorrectThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.CorrectThreshold));
+            numPossCorrectThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.PossiblyCorrectThreshold));
+            numDefWrongThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.DefinitelyWrongThreshold));
+            numIndetermThresh.Value = (decimal)Math.Max(0, Math.Min(100, _settings.IndeterminateThreshold));
+        }
+
+        private void SaveCurrentSettings()
+        {
+            _settings.Provider = cmbProvider.Text.Trim();
+            _settings.Model = txtModel.Text.Trim();
+            _settings.MaxQuestions = (int)numQuestions.Value;
+            _settings.Temperature = (double)numTemperature.Value;
+            _settings.UseRag = chkUseRag.Checked;
+            _settings.CorrectThreshold = (double)numCorrectThresh.Value;
+            _settings.PossiblyCorrectThreshold = (double)numPossCorrectThresh.Value;
+            _settings.DefinitelyWrongThreshold = (double)numDefWrongThresh.Value;
+            _settings.IndeterminateThreshold = (double)numIndetermThresh.Value;
+            _settings.Save();
+        }
+
+        private void btnSaveSettings_Click(object sender, EventArgs e)
+        {
+            SaveCurrentSettings();
+            AppendLine("Settings saved.");
         }
 
         // ── Database ──────────────────────────────────────────────────────────
@@ -191,6 +235,9 @@ namespace DemoApp
                 return;
             }
 
+            // Save settings on every run so they persist
+            SaveCurrentSettings();
+
             btnRunBenchmark.Enabled = false;
             btnSaveReport.Enabled = false;
             _lastReport = null;
@@ -200,9 +247,12 @@ namespace DemoApp
                 var config = AiSettings.LoadFromFile("ai-settings.json");
                 AiSettings.ApplyToEnvironment(config);
 
+                var temperature = (double)numTemperature.Value;
+
                 var session = AiSessionBuilder
                     .WithProvider(provider)
                     .WithModel(model)
+                    .WithTemperature(temperature)
                     .WithMaxTokens(256)
                     .WithSystemMessage(
                         "You are a factual Q&A assistant. Answer questions concisely and directly. " +
@@ -214,15 +264,25 @@ namespace DemoApp
                     MaxQuestions = (int)numQuestions.Value,
                     Provider = provider,
                     Model = model,
+                    Temperature = temperature,
                     UseRagContext = chkUseRag.Checked,
                     SimilarContextCount = 3
                 };
 
                 var progress = new Progress<string>(msg => AppendLine(msg));
 
-                AppendLine($"=== Starting benchmark: {opts.MaxQuestions} questions, provider={provider}, model={model} ===");
+                AppendLine($"=== Starting benchmark: {opts.MaxQuestions} questions, provider={provider}, model={model}, temp={temperature:F2} ===");
 
                 _lastReport = await QaBenchmarkRunner.RunAsync(opts, _db, session, progress);
+
+                // Populate report metadata
+                _lastReport.Provider = provider;
+                _lastReport.Model = model;
+                _lastReport.Temperature = temperature;
+                _lastReport.CorrectThreshold = (double)numCorrectThresh.Value;
+                _lastReport.PossiblyCorrectThreshold = (double)numPossCorrectThresh.Value;
+                _lastReport.DefinitelyWrongThreshold = (double)numDefWrongThresh.Value;
+                _lastReport.IndeterminateThreshold = (double)numIndetermThresh.Value;
 
                 rtbResults.AppendText(Environment.NewLine + _lastReport.FormatSummary());
                 rtbResults.ScrollToCaret();

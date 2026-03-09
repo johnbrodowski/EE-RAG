@@ -61,6 +61,7 @@ namespace LocalRAG.QaDataset
         public string Provider { get; set; } = "Anthropic";
         public string Model { get; set; } = "claude-haiku-4-5-20251001";
         public int MaxTokens { get; set; } = 256;
+        public double? Temperature { get; set; }
         /// <summary>If true and embeddings are available, inject similar Q&amp;A pairs as context.</summary>
         public bool UseRagContext { get; set; } = true;
         public int SimilarContextCount { get; set; } = 3;

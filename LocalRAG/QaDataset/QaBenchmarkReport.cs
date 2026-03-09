@@ -13,6 +13,17 @@ namespace LocalRAG.QaDataset
         public TimeSpan Duration { get; set; }
         public List<QaRunResult> Results { get; set; } = new();
 
+        // Run configuration
+        public string Provider { get; set; } = "";
+        public string Model { get; set; } = "";
+        public double? Temperature { get; set; }
+
+        // Score thresholds (null = not set, no pass/fail displayed)
+        public double? CorrectThreshold { get; set; }
+        public double? PossiblyCorrectThreshold { get; set; }
+        public double? DefinitelyWrongThreshold { get; set; }
+        public double? IndeterminateThreshold { get; set; }
+
         public double CorrectRate => TotalRun == 0 ? 0 : (double)Correct / TotalRun * 100;
         public double PossiblyCorrectRate => TotalRun == 0 ? 0 : (double)PossiblyCorrect / TotalRun * 100;
         public double DefinitelyWrongRate => TotalRun == 0 ? 0 : (double)DefinitelyWrong / TotalRun * 100;
@@ -24,12 +35,25 @@ namespace LocalRAG.QaDataset
             sb.AppendLine($"=== QA Benchmark Report (RunId: {RunId}) ===");
             sb.AppendLine($"Generated : {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             sb.AppendLine($"Duration  : {Duration:mm\\:ss\\.fff}");
+
+            if (!string.IsNullOrEmpty(Provider))
+                sb.AppendLine($"Provider  : {Provider}");
+            if (!string.IsNullOrEmpty(Model))
+                sb.AppendLine($"Model     : {Model}");
+            if (Temperature.HasValue)
+                sb.AppendLine($"Temperature: {Temperature.Value:F2}");
+
             sb.AppendLine();
             sb.AppendLine($"Questions tested  : {TotalRun}");
-            sb.AppendLine($"Correct           : {Correct,5} ({CorrectRate:F1}%)");
-            sb.AppendLine($"Possibly Correct  : {PossiblyCorrect,5} ({PossiblyCorrectRate:F1}%)");
-            sb.AppendLine($"Definitely Wrong  : {DefinitelyWrong,5} ({DefinitelyWrongRate:F1}%)");
-            sb.AppendLine($"Indeterminate     : {Indeterminate,5} ({IndeterminateRate:F1}%)");
+            sb.AppendLine(FormatScoreLine("Correct          ", Correct, CorrectRate,
+                CorrectThreshold, isAtLeast: true));
+            sb.AppendLine(FormatScoreLine("Possibly Correct ", PossiblyCorrect, PossiblyCorrectRate,
+                PossiblyCorrectThreshold, isAtLeast: true));
+            sb.AppendLine(FormatScoreLine("Definitely Wrong ", DefinitelyWrong, DefinitelyWrongRate,
+                DefinitelyWrongThreshold, isAtLeast: false));
+            sb.AppendLine(FormatScoreLine("Indeterminate    ", Indeterminate, IndeterminateRate,
+                IndeterminateThreshold, isAtLeast: false));
+
             sb.AppendLine();
             sb.AppendLine("─── Per-Question Results ───────────────────────────────────────────");
 
@@ -54,6 +78,22 @@ namespace LocalRAG.QaDataset
             }
 
             return sb.ToString();
+        }
+
+        private static string FormatScoreLine(
+            string label, int count, double rate, double? threshold, bool isAtLeast)
+        {
+            var line = $"{label} : {count,5} ({rate:F1}%)";
+
+            if (threshold.HasValue)
+            {
+                bool pass = isAtLeast ? rate >= threshold.Value : rate <= threshold.Value;
+                var symbol = isAtLeast ? "≥" : "≤";
+                var status = pass ? "PASS" : "FAIL";
+                line += $"  [{status} {symbol}{threshold.Value:F0}%]";
+            }
+
+            return line;
         }
     }
 }
