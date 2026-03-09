@@ -1451,7 +1451,12 @@ WHERE e.Id IN (
             using var connection = await GetConnectionAsync();
             using var command = new SqliteCommand(query, connection);
             command.Parameters.AddWithValue("@SearchText", ftsQuery);
-            command.Parameters.AddWithValue("@TopK", topK * 2); // Get more than needed for filtering
+            // Use a wider BM25 pre-filter (topK*5) so CalculateWordMatchScore sees enough
+            // candidates. BM25 can be fooled by high term-frequency in off-topic documents
+            // (e.g. "performance" in Docker entries outscoring "sql"+"indexes" in the SQL
+            // entry when the inner limit is too tight).  CalculateWordMatchScore is the
+            // precise ranker; BM25 is just a fast pre-filter.
+            command.Parameters.AddWithValue("@TopK", topK * 5);
 
             using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
