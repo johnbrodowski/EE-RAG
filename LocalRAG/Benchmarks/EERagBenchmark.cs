@@ -81,7 +81,7 @@ namespace LocalRAG.Benchmarks
         public static async Task<BenchmarkReport> RunAsync(
             BenchmarkDataset dataset,
             Dictionary<string, int> slugToId,
-            IChatSession session,
+            Func<IChatSession> sessionFactory,
             EmbeddingDatabaseNew db,
             BenchmarkOptions? options = null,
             IProgress<string>? progress = null,
@@ -98,6 +98,10 @@ namespace LocalRAG.Benchmarks
                 var benchCase = dataset.Cases[i];
                 progress?.Report(
                     $"[{i + 1}/{dataset.Cases.Count}] Case {benchCase.Id}: {benchCase.Query}");
+
+                // Fresh session per case — prevents conversation history from one case
+                // bleeding into the next and biasing the model's retrieval decisions.
+                var session = sessionFactory();
 
                 var caseSw = Stopwatch.StartNew();
                 var requestId = $"bench-run:{benchCase.Id}:{Guid.NewGuid():N}";

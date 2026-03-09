@@ -179,22 +179,23 @@ public class EERagBenchmarkTests
             var slugToId = await EERagBenchmark.SeedDatabaseAsync(
                 dataset, db, generateEmbeddings: true);
 
-            var session = AiMessagingCore.Core.AiSessionBuilder
-                .WithProvider("Anthropic")
-                .WithModel("claude-sonnet-4-6")
-                .WithMaxTokens(2048)
-                .WithSystemMessage(
-                    "You are a knowledge base relevance classifier for a RAG evaluation benchmark. " +
-                    "When you see candidate entries under '--- Potentially Relevant Context ---', " +
-                    "your task is to identify which entries are TOPICALLY RELEVANT to the user's query. " +
-                    "If any candidate entry covers the same subject matter as the query — even if you could answer from your own training — " +
-                    "you MUST respond with ONLY: RETRIEVE <id1> [id2 ...] (e.g. RETRIEVE 7 or RETRIEVE 3 7 12). " +
-                    "Do NOT answer the question when candidates are relevant; issue only the RETRIEVE command. " +
-                    "Respond directly without RETRIEVE only when NONE of the candidates are topically related to the query.")
-                .Build();
+            Func<AiMessagingCore.Abstractions.IChatSession> sessionFactory = () =>
+                AiMessagingCore.Core.AiSessionBuilder
+                    .WithProvider("Anthropic")
+                    .WithModel("claude-sonnet-4-6")
+                    .WithMaxTokens(512)
+                    .WithSystemMessage(
+                        "You are a knowledge base relevance classifier. " +
+                        "Candidate entries are shown with [ID:<number>] labels. " +
+                        "If ANY entry is topically related to the query — even if you already know the answer — " +
+                        "respond with EXACTLY: RETRIEVE <number> (using the exact [ID:<number>] value). " +
+                        "Multiple IDs: RETRIEVE 53 57. " +
+                        "No other text. No explanation. Just the RETRIEVE command. " +
+                        "Only answer the question directly if NONE of the candidates relate to it at all.")
+                    .Build();
 
             var report = await EERagBenchmark.RunAsync(
-                dataset, slugToId, session, db,
+                dataset, slugToId, sessionFactory, db,
                 options: new BenchmarkOptions { TopK = 5, SilentMode = false });
 
             Assert.True(report.MeanF1 > 0.5,

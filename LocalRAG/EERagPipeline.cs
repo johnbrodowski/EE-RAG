@@ -179,9 +179,10 @@ namespace LocalRAG
         {
             var sb = new StringBuilder();
             sb.AppendLine("--- Potentially Relevant Context ---");
-            sb.AppendLine("The following entries were retrieved as candidates. Each is a summary.");
-            sb.AppendLine("To retrieve the full content of an entry, respond with: RETRIEVE <id>");
-            sb.AppendLine("(e.g. \"RETRIEVE 7\" or \"RETRIEVE 3 7 12\").");
+            sb.AppendLine("Each entry below has a DATABASE ID shown as [ID:<number>].");
+            sb.AppendLine("To retrieve an entry's full content, respond with EXACTLY: RETRIEVE <number>");
+            sb.AppendLine("You MUST use the exact number from [ID:<number>] — do not renumber the entries yourself.");
+            sb.AppendLine("Example: if you see [ID:53] and [ID:57], respond: RETRIEVE 53 57");
             sb.AppendLine("You are not required to retrieve any entry.");
             sb.AppendLine("---");
 
@@ -192,7 +193,7 @@ namespace LocalRAG
                     ? c.Summary.Trim()
                     : TruncateToTokenBudget(c.Request ?? string.Empty, 150);
 
-                sb.AppendLine($"Entry {c.Id}: {summaryText}");
+                sb.AppendLine($"[ID:{c.Id}] {summaryText}");
             }
 
             return sb.ToString();
