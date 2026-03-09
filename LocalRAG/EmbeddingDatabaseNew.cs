@@ -63,9 +63,18 @@ namespace LocalRAG
 
         private static readonly HashSet<string> StopWords = new HashSet<string>
         {
+            // Articles, conjunctions, prepositions
             "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
-            "by", "is", "it", "as", "that", "this", "these", "those", "are", "was", "were", "be",
-            "from", "up", "about", "into", "over", "after"
+            "by", "as", "that", "this", "these", "those", "from", "up", "about", "into", "over", "after",
+            // Question words – appear in nearly every knowledge-base request ("How do I...", "What is...")
+            // and carry near-zero IDF, diluting BM25 scores for content-bearing terms.
+            "how", "what", "when", "where", "why", "which", "who",
+            // Auxiliary / modal verbs
+            "is", "it", "are", "was", "were", "be", "been", "being",
+            "do", "does", "did", "have", "has", "had",
+            "will", "would", "should", "could", "can", "may", "might",
+            // Pronouns
+            "i", "me", "my", "we", "our", "you", "your", "they", "their", "its"
         };
 
         public bool generateEmbeddings = false;
