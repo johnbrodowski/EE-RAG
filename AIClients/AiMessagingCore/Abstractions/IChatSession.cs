@@ -48,4 +48,17 @@ public interface IChatSession
 
     /// <summary>Switches to a different provider while preserving message history.</summary>
     ValueTask SwitchProviderAsync(string providerName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// EE-RAG transient injection — sends a user message with background context that is
+    /// provided to the model for this one inference call and then discarded.  The background
+    /// content is NEVER appended to the persistent <see cref="Messages"/> history, so it
+    /// cannot pollute future turns or be re-indexed into the knowledge base.
+    /// Only the clean user turn and the assistant reply enter the persistent record.
+    /// </summary>
+    ValueTask<ChatMessage> SendWithTransientBackgroundAsync(
+        string userMessage,
+        string transientBackground,
+        RequestOverrides? overrides = null,
+        CancellationToken cancellationToken = default);
 }

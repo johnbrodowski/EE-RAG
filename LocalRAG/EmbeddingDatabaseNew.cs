@@ -515,6 +515,71 @@ END;
             return await reader.ReadAsync() ? ReadFeedbackFromReader(reader) : null;
         }
 
+        /// <summary>
+        /// EE-RAG Phase 1 audit — called before the first inference call.
+        /// Records the IDs of every candidate summary that was offered to the model.
+        /// Stored in MetaData JSON only; never enters the messages array.
+        /// </summary>
+        public async Task UpdateRagCandidatesSurfacedAsync(string requestId, List<int> candidateIds)
+        {
+            if (string.IsNullOrEmpty(requestId)) return;
+
+            using var connection = await GetConnectionAsync();
+
+            // Read current MetaData
+            const string readQuery = "SELECT MetaData FROM embeddings WHERE RequestID = @RequestID";
+            using var readCmd = new SqliteCommand(readQuery, connection);
+            readCmd.Parameters.AddWithValue("@RequestID", requestId);
+            var raw = (string?)await readCmd.ExecuteScalarAsync();
+
+            var meta = string.IsNullOrWhiteSpace(raw)
+                ? new Dictionary<string, object?>()
+                : Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(raw)
+                  ?? new Dictionary<string, object?>();
+
+            meta["RagCandidatesSurfaced"] = candidateIds;
+
+            const string writeQuery = "UPDATE embeddings SET MetaData = @MetaData WHERE RequestID = @RequestID";
+            using var writeCmd = new SqliteCommand(writeQuery, connection);
+            writeCmd.Parameters.AddWithValue("@MetaData", Newtonsoft.Json.JsonConvert.SerializeObject(meta));
+            writeCmd.Parameters.AddWithValue("@RequestID", requestId);
+            await writeCmd.ExecuteNonQueryAsync();
+
+            InvalidateCache(requestId);
+        }
+
+        /// <summary>
+        /// EE-RAG Phase 2 audit — called after the final inference call.
+        /// Records the 8-hex hashes of the chunks the model actually elected to use.
+        /// Stored in MetaData JSON only; never enters the messages array.
+        /// </summary>
+        public async Task UpdateRagEntriesElectedAsync(string requestId, List<string> electedHashes)
+        {
+            if (string.IsNullOrEmpty(requestId)) return;
+
+            using var connection = await GetConnectionAsync();
+
+            const string readQuery = "SELECT MetaData FROM embeddings WHERE RequestID = @RequestID";
+            using var readCmd = new SqliteCommand(readQuery, connection);
+            readCmd.Parameters.AddWithValue("@RequestID", requestId);
+            var raw = (string?)await readCmd.ExecuteScalarAsync();
+
+            var meta = string.IsNullOrWhiteSpace(raw)
+                ? new Dictionary<string, object?>()
+                : Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object?>>(raw)
+                  ?? new Dictionary<string, object?>();
+
+            meta["RagEntriesElected"] = electedHashes;
+
+            const string writeQuery = "UPDATE embeddings SET MetaData = @MetaData WHERE RequestID = @RequestID";
+            using var writeCmd = new SqliteCommand(writeQuery, connection);
+            writeCmd.Parameters.AddWithValue("@MetaData", Newtonsoft.Json.JsonConvert.SerializeObject(meta));
+            writeCmd.Parameters.AddWithValue("@RequestID", requestId);
+            await writeCmd.ExecuteNonQueryAsync();
+
+            InvalidateCache(requestId);
+        }
+
         public async Task<List<(string request, string textResponse, string toolUseTextResponse, string toolContent, string toolResult, string requestID)>>
             GetConversationHistoryAsync(int messageCount = 100)
         {

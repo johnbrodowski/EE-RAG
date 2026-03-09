@@ -77,6 +77,15 @@ namespace LocalRAG
 
         [JsonProperty("ConnectionString", NullValueHandling = NullValueHandling.Ignore)]
         public string? ConnectionString { get; set; }
+
+        // EE-RAG two-phase audit — stored in MetaData JSON, never enters the messages array.
+        // Phase 1: written pre-inference with the IDs of every candidate summary offered.
+        // Phase 2: written post-inference with the 8-hex hashes of elected chunks.
+        [JsonProperty("RagCandidatesSurfaced", NullValueHandling = NullValueHandling.Ignore)]
+        public List<int>? RagCandidatesSurfaced { get; set; }
+
+        [JsonProperty("RagEntriesElected", NullValueHandling = NullValueHandling.Ignore)]
+        public List<string>? RagEntriesElected { get; set; }
     }
 
 }

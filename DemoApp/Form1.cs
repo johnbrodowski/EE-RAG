@@ -1,8 +1,7 @@
-using Azure.Core;
+using AiMessagingCore.Configuration;
+using AiMessagingCore.Core;
 
 using LocalRAG;
-
-using Microsoft.ML.OnnxRuntimeGenAI;
 
 using System.Diagnostics;
 using System.Text;
@@ -116,6 +115,101 @@ namespace DemoApp
         {
             var msg = await FormatRelevantFeedback(txtQuery.Text);
             txtResult.Text = msg;
+        }
+
+        // ── EE-RAG pipeline ──────────────────────────────────────────────────
+
+        private async void btnAskAI_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtQuery.Text)) return;
+
+            btnAskAI.Enabled = false;
+            txtResult.Text = "Running EE-RAG pipeline…\r\n";
+
+            try
+            {
+                var provider = cmbProvider.Text.Trim();
+                var model = txtModel.Text.Trim();
+
+                if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
+                {
+                    txtResult.Text = "Error: Provider and Model must be specified.";
+                    return;
+                }
+
+                var session = AiSessionBuilder
+                    .WithProvider(provider)
+                    .WithModel(model)
+                    .WithMaxTokens(2048)
+                    .WithSystemMessage(
+                        "You are a helpful assistant. " +
+                        "When you see a list of candidate context entries under '--- Potentially Relevant Context ---', " +
+                        "evaluate them and, if any are relevant to the query, respond ONLY with a RETRIEVE command " +
+                        "(e.g. RETRIEVE 7  or  RETRIEVE 3 7 12). " +
+                        "If none are relevant, answer the question directly without a RETRIEVE command.")
+                    .Build();
+
+                var userMessage = txtQuery.Text;
+                var requestId = Guid.NewGuid().ToString();
+                var silentMode = chkSilentMode.Checked;
+
+                var result = await EERagPipeline.RunPipelineAsync(
+                    userMessage,
+                    requestId,
+                    session,
+                    db,
+                    topK: 5,
+                    silentMode: silentMode);
+
+                DisplayEERagTrace(userMessage, result, silentMode);
+            }
+            catch (Exception ex)
+            {
+                txtResult.Text = $"EE-RAG error: {ex.Message}\r\n{ex.StackTrace}";
+            }
+            finally
+            {
+                btnAskAI.Enabled = true;
+            }
+        }
+
+        private void DisplayEERagTrace(string userMessage, EERagResult result, bool silentMode)
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine("=== EE-RAG Pipeline Trace ===");
+            sb.AppendLine();
+            sb.AppendLine($"[Query]  {userMessage}");
+            sb.AppendLine();
+
+            sb.AppendLine($"[Step 1-2]  Candidate summaries sent to model as transient context ({result.CandidateIdsSurfaced.Count} entries):");
+            sb.AppendLine(result.CandidateHeader);
+
+            sb.AppendLine("[Step 4-5]  Model's first response:");
+            sb.AppendLine(result.FirstResponse);
+            sb.AppendLine();
+
+            if (!result.RetrievalOccurred)
+            {
+                sb.AppendLine("[Step 6]  No RETRIEVE command issued — first response is final. No extra tokens consumed.");
+            }
+            else
+            {
+                var mode = silentMode ? "Layer 5 silent digestion" : "standard ephemeral injection";
+                sb.AppendLine($"[Step 6-7]  Model elected IDs: [{string.Join(", ", result.ElectedIds)}] — {mode}");
+                sb.AppendLine();
+                sb.AppendLine("[Step 7]  Final response (with [RAG:hash] tags):");
+            }
+
+            sb.AppendLine(result.FinalResponse);
+            sb.AppendLine();
+
+            sb.AppendLine("--- Two-Phase Audit (EE-RAG Section 3.4) ---");
+            sb.AppendLine($"rag_candidates_surfaced : [{string.Join(", ", result.CandidateIdsSurfaced)}]  (written pre-inference)");
+            sb.AppendLine($"rag_entries_elected     : [{string.Join(", ", result.ElectedHashes)}]  (written post-inference)");
+            sb.AppendLine("Both stored in MetaData JSON — zero context tokens consumed.");
+
+            txtResult.Text = sb.ToString().Replace("\n", "\r\n");
         }
 
         private async void runTestsToolStripMenuItem_Click(object sender, EventArgs e)

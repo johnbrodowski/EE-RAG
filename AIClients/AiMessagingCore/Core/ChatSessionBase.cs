@@ -135,6 +135,53 @@ public abstract class ChatSessionBase : IChatSession
         yield return final;
     }
 
+    /// <summary>
+    /// EE-RAG transient injection.  The <paramref name="transientBackground"/> is injected as
+    /// a temporary system message for this single inference call only.  It is NOT added to
+    /// <see cref="_messages"/> before or after the call, so the persistent conversation history
+    /// remains clean — no RAG content bleeds forward into future turns.
+    /// </summary>
+    public async ValueTask<ChatMessage> SendWithTransientBackgroundAsync(
+        string userMessage,
+        string transientBackground,
+        RequestOverrides? overrides = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Build a one-shot message list for this inference call only.
+        // Contents: persistent history + transient background (system) + user message.
+        // This list is never stored; _messages is not touched until the call is complete.
+        var ephemeral = new List<ChatMessage>(_messages)
+        {
+            new ChatMessage(ChatRole.System, transientBackground, DateTimeOffset.UtcNow),
+            new ChatMessage(ChatRole.User,   userMessage,         DateTimeOffset.UtcNow)
+        };
+
+        var merged = MergeWithSessionDefaults(overrides);
+
+        // Stream from the ephemeral context.
+        var full = string.Empty;
+        await foreach (var chunk in ExecuteStreamAsync(ephemeral, merged, cancellationToken))
+        {
+            full += chunk.Content;
+            OnTokenReceived?.Invoke(this, new Events.TokenReceivedEventArgs(chunk.Content, chunk));
+        }
+
+        // Persist ONLY the clean user turn and the assistant reply — no RAG content.
+        var userMsg = new ChatMessage(ChatRole.User, userMessage, DateTimeOffset.UtcNow);
+        var assistantMsg = new ChatMessage(
+            ChatRole.Assistant,
+            full,
+            DateTimeOffset.UtcNow,
+            new Dictionary<string, string> { ["final"] = "true" },
+            new TokenUsage(Math.Max(1, userMessage.Length / 4), Math.Max(1, full.Length / 4)),
+            Model);
+
+        _messages.Add(userMsg);
+        _messages.Add(assistantMsg);
+
+        return assistantMsg;
+    }
+
     public virtual ValueTask SwitchModelAsync(string model, CancellationToken cancellationToken = default)
     {
         Model = model;
