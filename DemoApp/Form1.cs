@@ -333,11 +333,13 @@ namespace DemoApp
                     .WithModel(model)
                     .WithMaxTokens(2048)
                     .WithSystemMessage(
-                        "You are a helpful assistant. " +
-                        "When you see a list of candidate context entries under '--- Potentially Relevant Context ---', " +
-                        "evaluate them and, if any are relevant to the query, respond ONLY with a RETRIEVE command " +
-                        "(e.g. RETRIEVE 7  or  RETRIEVE 3 7 12). " +
-                        "If none are relevant, answer the question directly without a RETRIEVE command.")
+                        "You are a knowledge base relevance classifier for a RAG evaluation benchmark. " +
+                        "When you see candidate entries under '--- Potentially Relevant Context ---', " +
+                        "your task is to identify which entries are TOPICALLY RELEVANT to the user's query. " +
+                        "If any candidate entry covers the same subject matter as the query — even if you could answer from your own training — " +
+                        "you MUST respond with ONLY: RETRIEVE <id1> [id2 ...] (e.g. RETRIEVE 7 or RETRIEVE 3 7 12). " +
+                        "Do NOT answer the question when candidates are relevant; issue only the RETRIEVE command. " +
+                        "Respond directly without RETRIEVE only when NONE of the candidates are topically related to the query.")
                     .Build();
 
                 txtResult.AppendText("Running benchmark cases...\r\n");
