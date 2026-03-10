@@ -23,18 +23,11 @@ namespace LocalRAG
         public string DatabasePath { get; set; } = GetAppPath(Path.Combine("Database", "Memory", "FeedbackEmbeddings512.db"));
 
         /// <summary>
-        /// Path to the ONNX BERT model file. Download a BERT model in ONNX format and update this path.
-        /// Example: https://huggingface.co/models?library=onnx&search=bert
+        /// Download a MiniLM-L6-v2-ONNX model in ONNX format and save in to a folder named models along side the executable 
+        /// Example: https://huggingface.co/onnx-community/all-MiniLM-L6-v2-ONNX/tree/main/onnx
         /// </summary>
-        public string ModelPath { get; set; } = GetAppPath(Path.Combine("all-MiniLM-L6-v2-ONNX", "model.onnx"));
-        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("all-MiniLM-L6-v2-ONNX", "vocab.txt"));
-
-        /// <summary>
-        /// Path to the BERT vocabulary file (vocab.txt). Should match the BERT model being used.
-        /// </summary>
-        //public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("Vocabularies", "base_uncased_large.txt"));
-        public int MaxSequenceLength { get; set; } = 128;
-        public int WordsPerString { get; set; } = 40;
+        public string ModelPath { get; set; } = GetAppPath(Path.Combine("model", "model.onnx"));
+        public string VocabularyPath { get; set; } = GetAppPath(Path.Combine("model", "vocab.txt"));
         public double OverlapPercentage { get; set; } = 25;
         public int NumberOfHashFunctions { get; set; } = 8;
         public int NumberOfHashTables { get; set; } = 10;
