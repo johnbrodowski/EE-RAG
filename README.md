@@ -54,7 +54,7 @@ The result is 68–95% fewer retrieval tokens than naive RAG (depending on elect
 │                                                              │
 │  EERagPipeline          ← orchestrates the 5-layer pipeline  │
 │  EmbeddingDatabaseNew   ← SQLite + LSH + FTS5 + caching      │
-│  EmbedderClassNew       ← BERT via ONNX Runtime              │
+│  EmbedderClassNew       ← ONNX embedding inference           │
 │  RAGConfiguration       ← all tuneable parameters            │
 │                                                              │
 │  Benchmarks/                                                 │
@@ -106,7 +106,7 @@ RETRIEVE 1 3
 Only the IDs surfaced in Layer 1 are accepted (prompt injection protection). If the model doesn't need any candidates, the pipeline short-circuits — no retrieval occurs and no full chunks are consumed.
 
 ### Layer 3 — Transient injection with hash provenance
-Elected chunks are fetched and injected as **transient background** — a special injection path that is used for inference but never stored in the session's persistent message history. Each chunk's BERT embedding is SHA-256 hashed to an 8-character hex identifier:
+Elected chunks are fetched and injected as **transient background** — a special injection path that is used for inference but never stored in the session's persistent message history. Each chunk embedding is SHA-256 hashed to an 8-character hex identifier:
 
 ```
 Final response: "The key idea behind gradient descent is... [RAG:a3f9b2c1] [RAG:7d4e1f83]"
@@ -134,13 +134,13 @@ EE-RAG/
 ├── LocalRAG/                         # Core library (.NET 10)
 │   ├── EERagPipeline.cs              # Main pipeline orchestrator
 │   ├── EmbeddingDatabaseNew.cs       # SQLite embedding store
-│   ├── EmbedderClassNew.cs           # BERT ONNX inference
+│   ├── EmbedderClass.cs              # ONNX embedding inference
 │   ├── RAGConfiguration.cs           # Tuneable parameters
 │   ├── Benchmarks/
 │   │   ├── EERagBenchmark.cs         # Pipeline benchmark runner
-│   │   ├── EERagBenchmarkModels.cs   # Dataset and report models
-│   │   └── BenchmarkData/
-│   │       └── eedag_benchmark_v1.json  # Embedded reference dataset
+│   │   └── EERagBenchmarkModels.cs   # Dataset and report models
+│   ├── BenchmarkData/
+│   │   └── eedag_benchmark_v1.json   # Embedded reference dataset
 │   └── QaDataset/
 │       ├── QaDatasetItem.cs          # Q&A item + outcome models
 │       ├── QaDatasetDatabase.cs      # SQLite for Q&A items/results
@@ -193,7 +193,7 @@ EE-RAG/
 **Requirements:**
 - .NET 10.0 SDK
 - Windows (WinForms UI) or Windows/Linux/macOS (library only)
-- A BERT model in ONNX format (see below)
+- A sentence-embedding model in ONNX format (see below)
 - At least one LLM provider API key
 
 **1. Clone and restore:**
@@ -203,7 +203,7 @@ cd EE-RAG
 dotnet restore
 ```
 
-**2. Download a BERT model:**
+**2. Download an embedding model:**
 
 The recommended model is `all-MiniLM-L6-v2` (fast, 768-dim, ~90MB):
 ```
@@ -216,7 +216,7 @@ EE-RAG/all-MiniLM-L6-v2-ONNX/model.onnx
 EE-RAG/all-MiniLM-L6-v2-ONNX/vocab.txt
 ```
 
-Or use any BERT-family ONNX model and point `RAGConfiguration.ModelPath` / `VocabularyPath` to it. Both 768-dim (base) and 1024-dim (large) models are supported.
+Or use any compatible ONNX sentence-transformer model and point `RAGConfiguration.ModelPath` / `VocabularyPath` to it. Models that produce 768-dim or 1024-dim embeddings are supported.
 
 **3. Configure your AI provider** — see [AI Provider Setup](#ai-provider-setup).
 
@@ -239,8 +239,7 @@ var config = new RAGConfiguration
     ModelPath        = "all-MiniLM-L6-v2-ONNX/model.onnx",
     VocabularyPath   = "all-MiniLM-L6-v2-ONNX/vocab.txt",
 
-    // Tokenisation / chunking
-    MaxSequenceLength = 128,    // max BERT token window
+    // Chunking / overlap
     WordsPerString    = 40,     // words per chunk before embedding
     OverlapPercentage = 25,     // % overlap between adjacent chunks
 
@@ -429,9 +428,9 @@ The import is idempotent — re-importing the same file will add new items and s
 
 ### Embedding Backfill
 
-The **RAG context injection** feature (which injects semantically similar Q&A pairs as context for each test question) requires questions to be embedded with BERT. After import:
+The **RAG context injection** feature (which injects semantically similar Q&A pairs as context for each test question) requires question embeddings. After import:
 
-1. Ensure your BERT model is configured (see [Configuration](#configuration)).
+1. Ensure your ONNX embedding model is configured (see [Configuration](#configuration)).
 2. Click **Start Backfill**.
 
 The backfiller runs in the background and embeds questions incrementally. You can click **Stop** at any time and resume later — it continues from where it left off. Progress is shown as `Embedded: X / Y`.
@@ -700,11 +699,11 @@ var session = AiSessionBuilder
     .WithSystemMessage(EERagPipeline.DefaultSystemPrompt)
     .Build();
 
-var pipeline = new EERagPipeline(db, session);
-
-var result = await pipeline.RunPipelineAsync(
-    requestId: Guid.NewGuid().ToString("N")[..8],
+var result = await EERagPipeline.RunPipelineAsync(
     userMessage: "What are the key principles of gradient descent?",
+    requestId: Guid.NewGuid().ToString("N")[..8],
+    session: session,
+    db: db,
     topK: 5,
     silentMode: false);
 
@@ -729,14 +728,16 @@ await session.SwitchModelAsync("gpt-4o");
 ## Running Tests
 
 ```bash
-# Fast unit tests only (no BERT model required)
+# Fast unit tests only (no embedding model required)
 dotnet test --filter "Category!=Integration"
 
-# All tests including integration (requires BERT model)
+# All tests including integration (requires embedding model)
 cp test.runsettings.example test.runsettings
 # Edit test.runsettings: set BERT_MODEL_PATH and BERT_VOCAB_PATH
 dotnet test --settings test.runsettings
 ```
+
+> Note: the environment variable names currently use the historical `BERT_*` prefix for compatibility.
 
 **test.runsettings** minimal content:
 ```xml
@@ -758,8 +759,8 @@ dotnet test --settings test.runsettings
 | `WordMatchScoreTests` | Text scoring | Nothing |
 | `LSHTests` | LSH correctness | Nothing |
 | `EERagBenchmarkTests` (unit) | Pipeline parsing, hashing, formatting | Nothing |
-| `IntegrationTests` | BERT embeddings, similarity search | BERT model |
-| `EERagBenchmarkTests` (AI) | Full pipeline F1 | BERT model + API key |
+| `IntegrationTests` | ONNX embeddings, similarity search | embedding model |
+| `EERagBenchmarkTests` (AI) | Full pipeline F1 | embedding model + API key |
 
 Expected output (unit tests only):
 ```
@@ -775,7 +776,7 @@ Test summary: total: 38, failed: 0, succeeded: 38, skipped: 0, duration: 13.4s
 
 ## Troubleshooting
 
-### BERT model not found
+### Embedding model not found
 Ensure `RAGConfiguration.ModelPath` points to the `.onnx` file directly (not the directory). Use absolute paths if relative paths aren't resolving.
 
 ### Low candidate recall in the pipeline benchmark
@@ -795,7 +796,7 @@ Try: lowering temperature, enabling RAG context injection (similar Q&A pairs gui
 Reduce `MaxCacheItems` in `RAGConfiguration`. The backfiller processes items one at a time but the cache retains embeddings. 5,000–10,000 is a reasonable range for most machines.
 
 ### Slow ONNX inference
-- Use a smaller model (all-MiniLM-L6-v2 is significantly faster than BERT-large).
+- Use a smaller model (all-MiniLM-L6-v2 is significantly faster than larger transformer encoders).
 - Tune `InterOpNumThreads` to match your physical core count.
 - For very large backfill jobs, set `IntraOpNumThreads = 1` and `InterOpNumThreads = (core count)` for better throughput.
 
@@ -808,13 +809,13 @@ Increase `TimeoutSeconds` in `ai-settings.json`. For long Auto-Tune sweeps over 
 
 Apache License 2.0 — see [LICENSE.txt](LICENSE.txt) for details.
 
-BERT models are distributed separately under their own licences (typically Apache 2.0 or MIT). See [Hugging Face](https://huggingface.co/models?library=onnx&search=bert) for model-specific terms.
+Embedding models are distributed separately under their own licences (typically Apache 2.0 or MIT). See [Hugging Face](https://huggingface.co/models?library=onnx&search=sentence-transformers) for model-specific terms.
 
 ---
 
 ## Acknowledgments
 
-- [ONNX Runtime](https://github.com/microsoft/onnxruntime) — BERT inference
+- [ONNX Runtime](https://github.com/microsoft/onnxruntime) — ONNX embedding inference
 - [FastBertTokenizer](https://github.com/NMZivkovic/FastBertTokenizer) — tokenisation
 - [Microsoft.Data.Sqlite](https://github.com/dotnet/efcore) — embedded database
-- BERT models from [Hugging Face](https://huggingface.co/)
+- Embedding models from [Hugging Face](https://huggingface.co/)
